@@ -1,7 +1,10 @@
 import sys
+from time import sleep
+
 import pygame
 
 from settings import Settings
+from game_stats import GameStats
 from ship import Ship
 from bullet import Bullet
 from alien import Alien
@@ -18,6 +21,9 @@ class AlienInvasion:
     self.settings.screen_height = self.screen.get_rect().height
     pygame.display.set_caption("Alien Invasion")
 
+    # Init stats
+    self.stats = GameStats(self)
+
     self.ship = Ship(self)
     self.bullets = pygame.sprite.Group()
     self.aliens = pygame.sprite.Group()
@@ -30,10 +36,12 @@ class AlienInvasion:
   def run_game(self):
     while True:
       self._check_events()
-      self.ship.update()
-      self._update_bullets()
-      self._update_aliens()
-      self._update_screen()
+      
+      if self.stats.game_active:
+        self.ship.update()
+        self._update_bullets()
+        self._update_aliens()
+        self._update_screen()
 
       for bullet in self.bullets.copy():
         if bullet.rect.bottom <= 0:
@@ -135,6 +143,15 @@ class AlienInvasion:
     for  alien in self.aliens.sprites():
       alien.rect.y += self.settings.fleet_drop_speed
     self.settings.fleet_direction *= -1
+
+  def _check_aliens_bottom(self):
+    # Check if any aliens have reached the bottom aof the screen.
+    scrren_rect = self.screen.get_rect()
+    for alien in self.aliens.sprites():
+      if alien.rect.bottom >= scrren_rect.bottom:
+        # Treat this the same as if the ship got hit
+        self._ship_hit()
+        break
   
   def _update_aliens(self):
     """
@@ -145,7 +162,27 @@ class AlienInvasion:
     self.aliens.update()
 
     if pygame.sprite.spritecollideany(self.ship, self.aliens):
+      self._ship_hit()
       print("Ship hit!!!")
+
+    # Check if the aliens hitting the bottom of the screen
+    self._check_aliens_bottom()
+  
+  def _ship_hit(self):
+    if self.stats.ships_left > 0:
+      # Descrement ships_left
+      self.stats.ships_left -= 1
+      # Get rid of any remaining  aliens and bullets
+      self.aliens.empty()
+      self.bullets.empty()
+      # Create a new fleet and center the ship
+      self._create_fleet()
+      self.ship.center_ship()
+      # Pause
+      sleep(0.5)
+
+    else:
+      self.stats.game_active = False
 
   # Define Update Event Feature
   def _update_screen(self):
